@@ -78,26 +78,17 @@ struct AudioDeviceManager: Sendable {
     }
   }
 
-  func nextDevice(after currentDevice: AudioDevice, type: AudioDeviceType) -> AudioDevice? {
+  func device(offsetFrom currentDevice: AudioDevice, by offset: Int, type: AudioDeviceType) -> AudioDevice? {
     let eligible = devices(of: type)
     guard !eligible.isEmpty else { return nil }
 
     guard let index = eligible.firstIndex(where: { $0.id == currentDevice.id }) else {
-      return eligible.first
+      return offset >= 0 ? eligible.first : eligible.last
     }
 
-    return eligible[(index + 1) % eligible.count]
-  }
-
-  func previousDevice(after currentDevice: AudioDevice, type: AudioDeviceType) -> AudioDevice? {
-    let eligible = devices(of: type)
-    guard !eligible.isEmpty else { return nil }
-
-    guard let index = eligible.firstIndex(where: { $0.id == currentDevice.id }) else {
-      return eligible.last
-    }
-
-    return eligible[(index - 1 + eligible.count) % eligible.count]
+    let count = eligible.count
+    let newIndex = ((index + offset) % count + count) % count
+    return eligible[newIndex]
   }
 
   func setDefaultDevice(_ device: AudioDevice, type: AudioDeviceType) throws {

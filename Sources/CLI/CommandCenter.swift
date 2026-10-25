@@ -64,38 +64,25 @@ final class CommandCenter {
     }
   }
 
+  private enum CycleDirection {
+    case next
+    case previous
+  }
+
   func cycleNextDevice(type requestedType: AudioDeviceType?, format: OutputFormat) {
-    let type = requestedType ?? .output
-    let types: [AudioDeviceType] = type == .all ? [.input, .output, .system] : [type]
-
-    var targets: [(AudioDevice, AudioDeviceType)] = []
-    var errors: [String] = []
-
-    for scope in types {
-      guard let current = manager.currentDevice(of: scope) else {
-        errors.append(describe(AudioSourceError.currentDeviceNotFound(scope)))
-        continue
-      }
-
-      guard let next = manager.nextDevice(after: current, type: scope) else {
-        errors.append(describe(AudioSourceError.nextDeviceNotFound(scope)))
-        continue
-      }
-
-      do {
-        try manager.setDefaultDevice(next, type: scope)
-        targets.append((next, scope))
-      } catch {
-        errors.append(describe(error))
-      }
-    }
-
-    emit(action: "next", targets: targets, errors: errors, format: format)
+    cycleDevice(direction: .next, type: requestedType, format: format)
   }
 
   func cyclePreviousDevice(type requestedType: AudioDeviceType?, format: OutputFormat) {
+    cycleDevice(direction: .previous, type: requestedType, format: format)
+  }
+
+  private func cycleDevice(
+    direction: CycleDirection, type requestedType: AudioDeviceType?, format: OutputFormat
+  ) {
     let type = requestedType ?? .output
     let types: [AudioDeviceType] = type == .all ? [.input, .output, .system] : [type]
+    let step = direction == .next ? 1 : -1
 
     var targets: [(AudioDevice, AudioDeviceType)] = []
     var errors: [String] = []
@@ -106,20 +93,47 @@ final class CommandCenter {
         continue
       }
 
-      guard let previous = manager.previousDevice(after: current, type: scope) else {
-        errors.append(describe(AudioSourceError.previousDeviceNotFound(scope)))
+      let eligibleCount = manager.devices(of: scope).count
+      guard eligibleCount > 0, let settled = settle(from: current, step: step, scope: scope, attempts: eligibleCount)
+      else {
+        errors.append(describe(notFoundError(direction, scope)))
         continue
       }
 
+      targets.append((settled, scope))
+    }
+
+    emit(action: direction == .next ? "next" : "previous", targets: targets, errors: errors, format: format)
+  }
+
+  // Walks the device list one step at a time in the requested direction, skipping
+  // any candidate the system silently refuses to actually make default (some
+  // virtual/loopback devices accept the set call but never become current),
+  // so a single unusable device can't permanently trap cycling.
+  private func settle(
+    from current: AudioDevice, step: Int, scope: AudioDeviceType, attempts: Int
+  ) -> AudioDevice? {
+    for offset in stride(from: step, through: step * attempts, by: step) {
+      guard let candidate = manager.device(offsetFrom: current, by: offset, type: scope) else {
+        return nil
+      }
+
       do {
-        try manager.setDefaultDevice(previous, type: scope)
-        targets.append((previous, scope))
+        try manager.setDefaultDevice(candidate, type: scope)
       } catch {
-        errors.append(describe(error))
+        continue
+      }
+
+      if manager.currentDevice(of: scope)?.id == candidate.id {
+        return candidate
       }
     }
 
-    emit(action: "previous", targets: targets, errors: errors, format: format)
+    return nil
+  }
+
+  private func notFoundError(_ direction: CycleDirection, _ scope: AudioDeviceType) -> AudioSourceError {
+    direction == .next ? .nextDeviceNotFound(scope) : .previousDeviceNotFound(scope)
   }
 
   func muteDevice(
