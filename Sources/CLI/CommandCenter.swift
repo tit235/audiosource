@@ -93,6 +93,35 @@ final class CommandCenter {
     emit(action: "next", targets: targets, errors: errors, format: format)
   }
 
+  func cyclePreviousDevice(type requestedType: AudioDeviceType?, format: OutputFormat) {
+    let type = requestedType ?? .output
+    let types: [AudioDeviceType] = type == .all ? [.input, .output, .system] : [type]
+
+    var targets: [(AudioDevice, AudioDeviceType)] = []
+    var errors: [String] = []
+
+    for scope in types {
+      guard let current = manager.currentDevice(of: scope) else {
+        errors.append(describe(AudioSourceError.currentDeviceNotFound(scope)))
+        continue
+      }
+
+      guard let previous = manager.previousDevice(after: current, type: scope) else {
+        errors.append(describe(AudioSourceError.previousDeviceNotFound(scope)))
+        continue
+      }
+
+      do {
+        try manager.setDefaultDevice(previous, type: scope)
+        targets.append((previous, scope))
+      } catch {
+        errors.append(describe(error))
+      }
+    }
+
+    emit(action: "previous", targets: targets, errors: errors, format: format)
+  }
+
   func muteDevice(
     mode: MuteMode, selection: Selection?, type requestedType: AudioDeviceType?,
     format: OutputFormat

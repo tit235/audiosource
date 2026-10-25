@@ -6,6 +6,7 @@ enum Command {
   case showAll
   case showCurrent
   case cycleNext
+  case cyclePrevious
   case mute(MuteMode)
   case set(Selection)
   case none
@@ -25,6 +26,7 @@ private enum BasicCommand {
   case showAll
   case showCurrent
   case cycleNext
+  case cyclePrevious
   case set
 }
 
@@ -53,6 +55,8 @@ final class CommandLineInterpreter {
         commandCenter.showCurrentDevice(type: parsed.type ?? .output, format: parsed.format)
       case .cycleNext:
         commandCenter.cycleNextDevice(type: parsed.type, format: parsed.format)
+      case .cyclePrevious:
+        commandCenter.cyclePreviousDevice(type: parsed.type, format: parsed.format)
       case .mute(let mode):
         commandCenter.muteDevice(
           mode: mode, selection: parsed.selection, type: parsed.type, format: parsed.format)
@@ -88,6 +92,9 @@ final class CommandLineInterpreter {
     case .cycleNext:
       if let mode = parsed.muteMode { return .mute(mode) }
       return .cycleNext
+    case .cyclePrevious:
+      if let mode = parsed.muteMode { return .mute(mode) }
+      return .cyclePrevious
     case nil:
       if let mode = parsed.muteMode { return .mute(mode) }
       return .none
@@ -128,6 +135,9 @@ final class CommandLineInterpreter {
         case "next":
           try rejectValue(inlineValue, option: "--next")
           parsed.basicCommand = .cycleNext
+        case "previous":
+          try rejectValue(inlineValue, option: "--previous")
+          parsed.basicCommand = .cyclePrevious
         case "help":
           try rejectValue(inlineValue, option: "--help")
           parsed.showHelp = true
@@ -160,6 +170,8 @@ final class CommandLineInterpreter {
             parsed.basicCommand = .showCurrent
           case "n":
             parsed.basicCommand = .cycleNext
+          case "p":
+            parsed.basicCommand = .cyclePrevious
           case "h":
             parsed.showHelp = true
           case "v":
@@ -270,6 +282,7 @@ final class CommandLineInterpreter {
         -t, --type <type>      Device type: input, output, system, all (default: output)
         -m, --mute <mode>      Set mute state: mute, unmute, toggle
         -n, --next             Cycle to the next audio device
+        -p, --previous         Cycle to the previous audio device
         -i, --id <id>          Set the audio device by numeric ID
         -u, --uid <uid>        Set the audio device by UID or UID substring
         -s, --name <name>      Set the audio device by name
@@ -281,7 +294,7 @@ final class CommandLineInterpreter {
         cli    Comma-separated device fields: name,type,id,uid
                Muting appends a fifth field: muted (true/false).
         json   JSON objects. Listing emits one object per line; current, set,
-               next, and mute emit a single operation result.
+               next, previous, and mute emit a single operation result.
 
       Examples:
         audiosource -a

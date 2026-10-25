@@ -54,6 +54,7 @@ struct OperationReport: Encodable, Sendable {
 enum AudioSourceError: Error, CustomStringConvertible {
   case currentDeviceNotFound(AudioDeviceType)
   case nextDeviceNotFound(AudioDeviceType)
+  case previousDeviceNotFound(AudioDeviceType)
   case deviceNamedNotFound(String, AudioDeviceType?)
   case deviceUIDNotFound(String, AudioDeviceType?)
   case deviceIDNotFound(AudioDeviceID)
@@ -70,7 +71,9 @@ enum AudioSourceError: Error, CustomStringConvertible {
     case .currentDeviceNotFound(let type):
       return "Could not find the current audio device of type \(type.displayName).  Nothing was changed."
     case .nextDeviceNotFound(let type):
-      return "Could not find the next audio device of type \(type.displayName).  Nothing was changed."
+      return "Could not find a next audio device of type \(type.displayName) that could be set as default.  Nothing was changed."
+    case .previousDeviceNotFound(let type):
+      return "Could not find a previous audio device of type \(type.displayName) that could be set as default.  Nothing was changed."
     case .deviceNamedNotFound(let name, let type):
       if let type {
         return
